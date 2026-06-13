@@ -9,7 +9,7 @@ export default function LoginScreen({ onSignIn }) {
             <IceCream2 className="w-7 h-7 text-white" strokeWidth={2.5} />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Yogurt
+            R2
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Phi Automation

@@ -158,7 +158,7 @@ export default function Sidebar({ parts, categories, brands, totalParts, bomCoun
           </div>
           <div>
             <h1 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
-              Yogurt
+              R2
             </h1>
             <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
               Phi Automation
