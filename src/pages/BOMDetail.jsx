@@ -303,6 +303,30 @@ export default function BOMDetail() {
         </div>
       )}
 
+      {items.length > 0 && (brandFilters.length > 0 || categoryFilters.length > 0) && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-4 -mt-2">
+          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400 mr-1">
+            Active:
+          </span>
+          {brandFilters.map((b) => (
+            <ActiveFilterChip
+              key={`b-${b}`}
+              label="Brand"
+              value={b}
+              onRemove={() => setBrandFilters((prev) => prev.filter((x) => x !== b))}
+            />
+          ))}
+          {categoryFilters.map((c) => (
+            <ActiveFilterChip
+              key={`c-${c}`}
+              label="Category"
+              value={c}
+              onRemove={() => setCategoryFilters((prev) => prev.filter((x) => x !== c))}
+            />
+          ))}
+        </div>
+      )}
+
       {items.length === 0 ? (
         <div className="card p-16 text-center">
           <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-4">
@@ -495,6 +519,24 @@ function SaveTemplatePrompt({ defaultName, onSave, onCancel }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function ActiveFilterChip({ label, value, onRemove }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
+      <span className="text-[10px] uppercase tracking-[0.12em] text-indigo-500 dark:text-indigo-400">
+        {label}
+      </span>
+      <span>{value}</span>
+      <button
+        onClick={onRemove}
+        className="p-0.5 rounded hover:bg-indigo-100 dark:hover:bg-indigo-500/25"
+        aria-label={`Remove ${label} ${value}`}
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </span>
   );
 }
 
