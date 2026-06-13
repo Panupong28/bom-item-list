@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
   Search,
@@ -26,6 +26,7 @@ import { DataContext } from '../App.jsx';
 import { db } from '../firebase.js';
 import AddPartModal from '../components/AddPartModal.jsx';
 import ImportPartsModal from '../components/ImportPartsModal.jsx';
+import MultiSelect from '../components/MultiSelect.jsx';
 import { runSeed } from '../seed.js';
 
 const baht = (n) =>
@@ -35,22 +36,67 @@ export default function PartsView() {
   const { category } = useParams();
   const decodedCategory = category ? decodeURIComponent(category) : null;
   const [searchParams, setSearchParams] = useSearchParams();
-  const brandFilter = searchParams.get('brand') || '';
+  const urlBrand = searchParams.get('brand') || '';
+  // brandFilter is kept around for HeroCard/StatCard which display the
+  // single-brand context (when exactly one brand is active it equals urlBrand).
+  const brandFilter = urlBrand;
 
   const { parts, partsByCategory, categories, loading } = useContext(DataContext);
 
   const [search, setSearch] = useState('');
+  const [brandFilters, setBrandFilters] = useState(() => (urlBrand ? [urlBrand] : []));
+  const [categoryFilters, setCategoryFilters] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingPart, setEditingPart] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [seeding, setSeeding] = useState(false);
 
+  // Two-way sync: URL ?brand <-> brandFilters when there's exactly one brand.
+  useEffect(() => {
+    setBrandFilters((prev) => {
+      if (urlBrand) {
+        if (prev.length === 1 && prev[0] === urlBrand) return prev;
+        return [urlBrand];
+      }
+      if (prev.length === 1) return [];
+      return prev;
+    });
+  }, [urlBrand]);
+
+  const updateBrandFilters = (next) => {
+    setBrandFilters(next);
+    const params = new URLSearchParams(searchParams);
+    if (next.length === 1) params.set('brand', next[0]);
+    else params.delete('brand');
+    setSearchParams(params, { replace: true });
+  };
+
   const scopeParts = decodedCategory ? partsByCategory[decodedCategory] || [] : parts;
+
+  const availableBrands = useMemo(() => {
+    const set = new Set();
+    for (const p of scopeParts) {
+      const b = (p.brand || '').trim();
+      if (b) set.add(b);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [scopeParts]);
+
+  const availableCategories = useMemo(() => {
+    const set = new Set();
+    for (const p of scopeParts) if (p.category) set.add(p.category);
+    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [scopeParts]);
 
   const filteredParts = useMemo(() => {
     let list = scopeParts;
-    if (brandFilter) {
-      list = list.filter((p) => (p.brand || '').trim() === brandFilter);
+    if (brandFilters.length > 0) {
+      const set = new Set(brandFilters);
+      list = list.filter((p) => set.has((p.brand || '').trim()));
+    }
+    if (categoryFilters.length > 0) {
+      const set = new Set(categoryFilters);
+      list = list.filter((p) => set.has(p.category));
     }
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -62,12 +108,18 @@ export default function PartsView() {
       );
     }
     return list;
-  }, [scopeParts, search, brandFilter]);
+  }, [scopeParts, search, brandFilters, categoryFilters]);
 
   const stats = useMemo(() => {
-    const scope = brandFilter
-      ? scopeParts.filter((p) => (p.brand || '').trim() === brandFilter)
-      : scopeParts;
+    let scope = scopeParts;
+    if (brandFilters.length > 0) {
+      const set = new Set(brandFilters);
+      scope = scope.filter((p) => set.has((p.brand || '').trim()));
+    }
+    if (categoryFilters.length > 0) {
+      const set = new Set(categoryFilters);
+      scope = scope.filter((p) => set.has(p.category));
+    }
     const priced = scope.filter((p) => p.price != null);
     const total = priced.reduce((s, p) => s + (p.price || 0), 0);
     const brands = new Set(scope.map((p) => p.brand).filter(Boolean));
@@ -77,7 +129,7 @@ export default function PartsView() {
       pricedCount: priced.length,
       totalValue: total,
     };
-  }, [scopeParts, brandFilter]);
+  }, [scopeParts, brandFilters, categoryFilters]);
 
   const handleAddPart = async (data) => {
     await addDoc(collection(db, 'parts'), { ...data, createdAt: serverTimestamp() });
@@ -112,13 +164,16 @@ export default function PartsView() {
     }
   };
 
-  const clearBrand = () => {
-    const next = new URLSearchParams(searchParams);
-    next.delete('brand');
-    setSearchParams(next);
+  const clearAllFilters = () => {
+    setSearch('');
+    setCategoryFilters([]);
+    updateBrandFilters([]);
   };
 
-  const activeFilterCount = (search.trim() ? 1 : 0) + (brandFilter ? 1 : 0);
+  const hasFilter =
+    !!search.trim() || brandFilters.length > 0 || categoryFilters.length > 0;
+  const activeFilterCount =
+    (search.trim() ? 1 : 0) + brandFilters.length + categoryFilters.length;
 
   return (
     <div className="px-6 lg:px-10 py-8 max-w-[1500px] mx-auto">
@@ -153,23 +208,45 @@ export default function PartsView() {
         />
       </div>
 
-      {brandFilter && (
-        <div className="mb-4 flex items-center gap-2">
-          <span className="micro-label">Filters</span>
-          <FilterChip label={`Brand: ${brandFilter}`} onClear={clearBrand} />
-        </div>
-      )}
-
-      <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-[260px] max-w-md">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search description, part no, brand…"
-            className="w-full pl-10 pr-3 py-2.5 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-xl shadow-soft-sm placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap flex-1 min-w-[260px]">
+          <div className="relative flex-1 min-w-[240px] max-w-md">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search description, part no, brand…"
+              className="w-full pl-10 pr-3 py-2.5 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-xl shadow-soft-sm placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+          <MultiSelect
+            label="Brand"
+            allLabel="All brands"
+            options={availableBrands}
+            selected={brandFilters}
+            onChange={updateBrandFilters}
+            emptyMessage="No brands"
           />
+          {!decodedCategory && (
+            <MultiSelect
+              label="Category"
+              allLabel="All categories"
+              options={availableCategories}
+              selected={categoryFilters}
+              onChange={setCategoryFilters}
+              emptyMessage="No categories"
+            />
+          )}
+          {hasFilter && (
+            <button
+              onClick={clearAllFilters}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear filters
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -188,6 +265,30 @@ export default function PartsView() {
           </button>
         </div>
       </div>
+
+      {(brandFilters.length > 0 || categoryFilters.length > 0) && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-4">
+          <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400 mr-1">
+            Active:
+          </span>
+          {brandFilters.map((b) => (
+            <ActiveFilterChip
+              key={`b-${b}`}
+              label="Brand"
+              value={b}
+              onRemove={() => updateBrandFilters(brandFilters.filter((x) => x !== b))}
+            />
+          ))}
+          {categoryFilters.map((c) => (
+            <ActiveFilterChip
+              key={`c-${c}`}
+              label="Category"
+              value={c}
+              onRemove={() => setCategoryFilters((prev) => prev.filter((x) => x !== c))}
+            />
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="p-16 text-center text-slate-500 dark:text-slate-400 card">Loading…</div>
@@ -273,10 +374,7 @@ export default function PartsView() {
             </span>
             {activeFilterCount > 0 && (
               <button
-                onClick={() => {
-                  setSearch('');
-                  clearBrand();
-                }}
+                onClick={clearAllFilters}
                 className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
               >
                 Clear filters
@@ -320,6 +418,24 @@ function FilterChip({ label, onClear }) {
         onClick={onClear}
         className="p-0.5 rounded hover:bg-indigo-100 dark:hover:bg-indigo-500/25"
         aria-label="Clear filter"
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </span>
+  );
+}
+
+function ActiveFilterChip({ label, value, onRemove }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
+      <span className="text-[10px] uppercase tracking-[0.12em] text-indigo-500 dark:text-indigo-400">
+        {label}
+      </span>
+      <span>{value}</span>
+      <button
+        onClick={onRemove}
+        className="p-0.5 rounded hover:bg-indigo-100 dark:hover:bg-indigo-500/25"
+        aria-label={`Remove ${label} ${value}`}
       >
         <X className="w-3 h-3" />
       </button>
