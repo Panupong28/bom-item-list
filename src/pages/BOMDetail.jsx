@@ -16,6 +16,7 @@ import { DataContext } from '../App.jsx';
 import { db } from '../firebase.js';
 import PartPickerModal from '../components/PartPickerModal.jsx';
 import BOMFormModal from '../components/BOMFormModal.jsx';
+import MultiSelect from '../components/MultiSelect.jsx';
 import { buildPartsById, resolveItems } from '../lib/resolveItems.js';
 
 const baht = (n) =>
@@ -31,8 +32,8 @@ export default function BOMDetail() {
   const [showEdit, setShowEdit] = useState(false);
   const [showSaveTpl, setShowSaveTpl] = useState(false);
   const [search, setSearch] = useState('');
-  const [brandFilter, setBrandFilter] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [brandFilters, setBrandFilters] = useState([]);
+  const [categoryFilters, setCategoryFilters] = useState([]);
 
   const partsById = useMemo(() => buildPartsById(parts), [parts]);
   const resolvedItems = useMemo(
@@ -63,8 +64,14 @@ export default function BOMDetail() {
 
   const filteredItems = useMemo(() => {
     let list = resolvedItems;
-    if (brandFilter) list = list.filter((it) => (it.brand || '').trim() === brandFilter);
-    if (categoryFilter) list = list.filter((it) => it.category === categoryFilter);
+    if (brandFilters.length > 0) {
+      const brandSet = new Set(brandFilters);
+      list = list.filter((it) => brandSet.has((it.brand || '').trim()));
+    }
+    if (categoryFilters.length > 0) {
+      const catSet = new Set(categoryFilters);
+      list = list.filter((it) => catSet.has(it.category));
+    }
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -75,7 +82,7 @@ export default function BOMDetail() {
       );
     }
     return list;
-  }, [resolvedItems, search, brandFilter, categoryFilter]);
+  }, [resolvedItems, search, brandFilters, categoryFilters]);
 
   const total = useMemo(
     () => resolvedItems.reduce((s, it) => s + (it.price || 0) * (it.qty || 1), 0),
@@ -87,11 +94,11 @@ export default function BOMDetail() {
     [filteredItems]
   );
 
-  const hasFilter = !!(search.trim() || brandFilter || categoryFilter);
+  const hasFilter = !!(search.trim() || brandFilters.length > 0 || categoryFilters.length > 0);
   const clearFilters = () => {
     setSearch('');
-    setBrandFilter('');
-    setCategoryFilter('');
+    setBrandFilters([]);
+    setCategoryFilters([]);
   };
 
   if (!bom) {
@@ -260,30 +267,22 @@ export default function BOMDetail() {
               className="w-full pl-10 pr-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-xl placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
-          <select
-            value={brandFilter}
-            onChange={(e) => setBrandFilter(e.target.value)}
-            className="px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">All brands</option>
-            {itemBrands.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">All categories</option>
-            {itemCategories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <MultiSelect
+            label="Brand"
+            allLabel="All brands"
+            options={itemBrands}
+            selected={brandFilters}
+            onChange={setBrandFilters}
+            emptyMessage="No brands in this BOM"
+          />
+          <MultiSelect
+            label="Category"
+            allLabel="All categories"
+            options={itemCategories}
+            selected={categoryFilters}
+            onChange={setCategoryFilters}
+            emptyMessage="No categories in this BOM"
+          />
           {hasFilter && (
             <button
               onClick={clearFilters}
