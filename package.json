@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "vite build && firebase deploy --only hosting"
+    "deploy": "vite build && firebase deploy --only hosting",
+    "import-parts": "node scripts/import-parts.js",
+    "discover-schema": "node scripts/discover-schema.js",
+    "import-from-mssql": "node scripts/import-from-mssql.js"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
@@ -20,6 +23,9 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
+    "dotenv": "^17.4.2",
+    "firebase-admin": "^14.0.0",
+    "mssql": "^12.5.5",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.15",
     "vite": "^5.4.8"

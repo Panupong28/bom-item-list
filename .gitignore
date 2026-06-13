@@ -10,6 +10,9 @@ dist
 .claude/settings.local.json
 src/firebase-config.local.js
 
+# MSSQL import credentials — NEVER commit
+.env.import
+
 # Firebase service account keys — NEVER commit
 *firebase-adminsdk*.json
 *service-account*.json
