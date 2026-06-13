@@ -10,9 +10,10 @@ import {
   ClipboardList,
   Search,
   X,
+  Download,
 } from 'lucide-react';
 import { deleteDoc, doc, serverTimestamp, updateDoc, addDoc, collection } from 'firebase/firestore';
-import { DataContext } from '../App.jsx';
+import { AuthContext, DataContext } from '../App.jsx';
 import { db } from '../firebase.js';
 import PartPickerModal from '../components/PartPickerModal.jsx';
 import BOMFormModal from '../components/BOMFormModal.jsx';
@@ -25,12 +26,14 @@ const baht = (n) =>
 export default function BOMDetail() {
   const { id } = useParams();
   const { boms, parts } = useContext(DataContext);
+  const authCtx = useContext(AuthContext);
   const navigate = useNavigate();
   const bom = boms.find((b) => b.id === id);
 
   const [showPicker, setShowPicker] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showSaveTpl, setShowSaveTpl] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState('');
   const [brandFilters, setBrandFilters] = useState([]);
   const [categoryFilters, setCategoryFilters] = useState([]);
@@ -161,6 +164,24 @@ export default function BOMDetail() {
     navigate('/boms');
   };
 
+  const handleExport = async () => {
+    if (!bom) return;
+    if (!resolvedItems.length) {
+      alert('This BOM has no items to export.');
+      return;
+    }
+    setExporting(true);
+    try {
+      const { exportBomXlsx } = await import('../lib/exportBomXlsx.js');
+      await exportBomXlsx(bom, resolvedItems, authCtx?.user);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert(`Export failed: ${err.message || err}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleSaveTemplate = async (name) => {
     const trimmed = name.trim();
     if (!trimmed) return;
@@ -216,6 +237,15 @@ export default function BOMDetail() {
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold transition"
             >
               <Pencil className="w-3.5 h-3.5" /> Edit
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={exporting || items.length === 0}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold transition disabled:opacity-50"
+              title="Download as Excel (.xlsx)"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {exporting ? 'Exporting…' : 'Export Excel'}
             </button>
             <button
               onClick={() => setShowSaveTpl(true)}
