@@ -87,6 +87,13 @@ export async function exportBomXlsx(bom, items, user) {
     setCell('I', it.qty || 1);
     setCell('J', signer);
     setCell('K', null);
+
+    // Force left alignment on Part no (F) and Description (G), preserving
+    // whatever vertical alignment / wrap settings already exist on the cell.
+    for (const col of ['F', 'G']) {
+      const c = ws.getCell(`${col}${r}`);
+      c.alignment = { ...(c.alignment || {}), horizontal: 'left' };
+    }
   });
 
   // Clear source's leftover sample rows (keep styles, blank the values)
