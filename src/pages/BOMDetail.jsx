@@ -298,7 +298,7 @@ export default function BOMDetail() {
                   onClick={() => runExport('revision')}
                   className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
                 >
-                  <div className="font-semibold">Revision History</div>
+                  <div className="font-semibold">BOM Template (Org)</div>
                   <div className="text-[10px] text-slate-500 dark:text-slate-400">
                     Electrical revision form (.xlsx)
                   </div>
