@@ -1,4 +1,4 @@
-import { IceCream2 } from 'lucide-react';
+import { Bot } from 'lucide-react';
 
 export default function LoginScreen({ onSignIn }) {
   return (
@@ -6,7 +6,7 @@ export default function LoginScreen({ onSignIn }) {
       <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 p-8">
         <div className="flex flex-col items-center text-center">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 flex items-center justify-center shadow-glow-indigo mb-4">
-            <IceCream2 className="w-7 h-7 text-white" strokeWidth={2.5} />
+            <Bot className="w-7 h-7 text-white" strokeWidth={2.5} />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
             R2

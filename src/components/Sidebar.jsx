@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  IceCream2,
+  Bot,
   Plus,
   Tag,
   LayoutGrid,
@@ -154,7 +154,7 @@ export default function Sidebar({ parts, categories, brands, totalParts, bomCoun
       <div className="px-6 py-6 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-700 flex items-center justify-center shadow-glow-indigo">
-            <IceCream2 className="w-5 h-5 text-white" strokeWidth={2.5} />
+            <Bot className="w-5 h-5 text-white" strokeWidth={2.5} />
           </div>
           <div>
             <h1 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
