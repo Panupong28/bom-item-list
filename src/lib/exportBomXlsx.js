@@ -75,7 +75,7 @@ export async function exportBomXlsx(bom, items, user) {
       // so they don't render as plain cells.
       if (overflow) applySnapshot(cell, rowSnap[col]);
     };
-    setCell('B', null); // Source B11+ already has dates + correct numFmt; leave styles alone
+    setCell('B', null);
     ws.getCell(`B${r}`).value = new Date();
     if (overflow) applySnapshot(ws.getCell(`B${r}`), rowSnap.B);
     setCell('C', null);
@@ -87,19 +87,27 @@ export async function exportBomXlsx(bom, items, user) {
     setCell('I', it.qty || 1);
     setCell('J', signer);
     setCell('K', null);
-
-    // Force left alignment on Part no (F) and Description (G), preserving
-    // whatever vertical alignment / wrap settings already exist on the cell.
-    for (const col of ['F', 'G']) {
-      const c = ws.getCell(`${col}${r}`);
-      c.alignment = { ...(c.alignment || {}), horizontal: 'left' };
-    }
   });
 
   // Clear source's leftover sample rows (keep styles, blank the values)
   for (let r = DATA_START_ROW + items.length; r <= sourceLastDataRow; r++) {
     for (const col of COLS) {
       ws.getCell(`${col}${r}`).value = null;
+    }
+  }
+
+  // Force horizontal:left on Part No (F) and Description (G) across the
+  // entire data range — source rows had inconsistent alignment (some
+  // centered, some left, some unset). Run after value writes so the
+  // overflow-style snapshot does not clobber this.
+  const lastForceRow = Math.max(
+    sourceLastDataRow,
+    DATA_START_ROW + items.length - 1
+  );
+  for (let r = DATA_START_ROW; r <= lastForceRow; r++) {
+    for (const col of ['F', 'G']) {
+      const c = ws.getCell(`${col}${r}`);
+      c.alignment = { ...(c.alignment || {}), horizontal: 'left' };
     }
   }
 
