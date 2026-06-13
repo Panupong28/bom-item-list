@@ -8,6 +8,8 @@ import {
   Save,
   FileStack,
   ClipboardList,
+  Search,
+  X,
 } from 'lucide-react';
 import { deleteDoc, doc, serverTimestamp, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { DataContext } from '../App.jsx';
@@ -28,17 +30,69 @@ export default function BOMDetail() {
   const [showPicker, setShowPicker] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showSaveTpl, setShowSaveTpl] = useState(false);
+  const [search, setSearch] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
 
   const partsById = useMemo(() => buildPartsById(parts), [parts]);
   const resolvedItems = useMemo(
-    () => resolveItems(bom?.items, partsById),
+    () => resolveItems(bom?.items, partsById).map((it, i) => ({ ...it, _idx: i })),
     [bom?.items, partsById]
   );
+
+  const itemBrands = useMemo(() => {
+    const set = new Set();
+    for (const it of resolvedItems) {
+      const b = (it.brand || '').trim();
+      if (b) set.add(b);
+    }
+    return [...set].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base' })
+    );
+  }, [resolvedItems]);
+
+  const itemCategories = useMemo(() => {
+    const set = new Set();
+    for (const it of resolvedItems) {
+      if (it.category) set.add(it.category);
+    }
+    return [...set].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base' })
+    );
+  }, [resolvedItems]);
+
+  const filteredItems = useMemo(() => {
+    let list = resolvedItems;
+    if (brandFilter) list = list.filter((it) => (it.brand || '').trim() === brandFilter);
+    if (categoryFilter) list = list.filter((it) => it.category === categoryFilter);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (it) =>
+          it.description?.toLowerCase().includes(q) ||
+          it.partNo?.toLowerCase().includes(q) ||
+          it.brand?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [resolvedItems, search, brandFilter, categoryFilter]);
 
   const total = useMemo(
     () => resolvedItems.reduce((s, it) => s + (it.price || 0) * (it.qty || 1), 0),
     [resolvedItems]
   );
+
+  const filteredSubtotal = useMemo(
+    () => filteredItems.reduce((s, it) => s + (it.price || 0) * (it.qty || 1), 0),
+    [filteredItems]
+  );
+
+  const hasFilter = !!(search.trim() || brandFilter || categoryFilter);
+  const clearFilters = () => {
+    setSearch('');
+    setBrandFilter('');
+    setCategoryFilter('');
+  };
 
   if (!bom) {
     return (
@@ -175,7 +229,15 @@ export default function BOMDetail() {
 
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-          Items <span className="text-slate-400 dark:text-slate-500 font-medium">· {items.length}</span>
+          Items{' '}
+          <span className="text-slate-400 dark:text-slate-500 font-medium">
+            · {items.length}
+            {hasFilter && items.length > 0 && (
+              <span className="ml-1 text-indigo-600 dark:text-indigo-400">
+                (showing {filteredItems.length})
+              </span>
+            )}
+          </span>
         </h3>
         <button
           onClick={() => setShowPicker(true)}
@@ -185,6 +247,62 @@ export default function BOMDetail() {
           Add items from library
         </button>
       </div>
+
+      {items.length > 0 && (
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <div className="relative flex-1 min-w-[240px] max-w-md">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search description, part no, brand…"
+              className="w-full pl-10 pr-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-xl placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+          <select
+            value={brandFilter}
+            onChange={(e) => setBrandFilter(e.target.value)}
+            className="px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="">All brands</option>
+            {itemBrands.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="">All categories</option>
+            {itemCategories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          {hasFilter && (
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear filters
+            </button>
+          )}
+          {hasFilter && filteredSubtotal > 0 && (
+            <span className="ml-auto text-xs font-semibold text-slate-500 dark:text-slate-400">
+              Filtered subtotal:{' '}
+              <span className="font-mono tabular-nums text-emerald-600 dark:text-emerald-400">
+                {baht(filteredSubtotal)}
+              </span>
+            </span>
+          )}
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div className="card p-16 text-center">
@@ -216,7 +334,18 @@ export default function BOMDetail() {
                 </tr>
               </thead>
               <tbody>
-                {resolvedItems.map((it, idx) => {
+                {filteredItems.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={9}
+                      className="px-5 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
+                    >
+                      No items match your filter.
+                    </td>
+                  </tr>
+                ) : null}
+                {filteredItems.map((it) => {
+                  const idx = it._idx;
                   const subtotal = (it.price || 0) * (it.qty || 1);
                   return (
                     <tr
