@@ -2,40 +2,49 @@ import ExcelJS from 'exceljs';
 
 const TEMPLATE_PATH = '/samples/revision-history-template.xlsx';
 const DATA_START_ROW = 11;
-const DATA_COLS = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+const STYLE_TEMPLATE_ROW = 12; // row 11 has an outlier font; row 12 is consistent
+const COLS = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
 
-function clone(o) {
-  return o == null ? o : JSON.parse(JSON.stringify(o));
-}
-
-function applyStyle(target, template) {
-  if (template.font) target.font = clone(template.font);
-  if (template.fill) target.fill = clone(template.fill);
-  if (template.alignment) target.alignment = clone(template.alignment);
-  if (template.border) target.border = clone(template.border);
-  if (template.numFmt) target.numFmt = template.numFmt;
-}
-
+const clone = (v) => (v == null ? v : JSON.parse(JSON.stringify(v)));
 const safe = (s) =>
   String(s || 'BOM').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_');
 
+function snapshotRow(ws, row, cols) {
+  const out = {};
+  for (const col of cols) {
+    const c = ws.getCell(`${col}${row}`);
+    out[col] = {
+      font: clone(c.font),
+      fill: clone(c.fill),
+      alignment: clone(c.alignment),
+      border: clone(c.border),
+      numFmt: c.numFmt,
+    };
+  }
+  return out;
+}
+
+function applySnapshot(cell, snap) {
+  if (snap.font) cell.font = clone(snap.font);
+  if (snap.fill) cell.fill = clone(snap.fill);
+  if (snap.alignment) cell.alignment = clone(snap.alignment);
+  if (snap.border) cell.border = clone(snap.border);
+  if (snap.numFmt) cell.numFmt = snap.numFmt;
+}
+
 export async function exportBomXlsx(bom, items, user) {
   const res = await fetch(TEMPLATE_PATH);
-  if (!res.ok) {
-    throw new Error(`Could not load Excel template (${res.status})`);
-  }
+  if (!res.ok) throw new Error(`Could not load Excel template (${res.status})`);
   const buf = await res.arrayBuffer();
 
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf);
-
   const ws = wb.worksheets[0];
-  const signer = user?.displayName || user?.email?.split('@')[0] || '';
-  const today = new Date();
 
-  // --- Header section: keep the source's styles, just rewrite values ---
-  ws.getCell('B6').value = today;
-  ws.getCell('B6').numFmt = 'yyyy-mm-dd';
+  const signer = user?.displayName || user?.email?.split('@')[0] || '';
+
+  // === Header section ===
+  // B6 and B7 keep the source's TODAY() formula and numFmt.
   ws.getCell('F6').value = `Project : ${[bom.projectNo, bom.projectName]
     .filter(Boolean)
     .join(' ')}`;
@@ -45,52 +54,47 @@ export async function exportBomXlsx(bom, items, user) {
   ws.getCell('J7').value = signer;
   ws.getCell('K7').value = signer;
 
-  // --- Data section ---
-  // Snapshot the styles of the source's first data row (11) so we can
-  // re-apply them to every output row, including ones beyond the source's
-  // pre-styled range.
-  const rowTemplate = {};
-  for (const col of DATA_COLS) {
-    const c = ws.getCell(`${col}${DATA_START_ROW}`);
-    rowTemplate[col] = {
-      font: c.font,
-      fill: c.fill,
-      alignment: c.alignment,
-      border: c.border,
-      numFmt: c.numFmt,
-    };
+  // === Data rows ===
+  // Detect source's last data row by scanning column F (Part no) downwards
+  let sourceLastDataRow = DATA_START_ROW - 1;
+  for (let r = DATA_START_ROW; r <= 100; r++) {
+    const v = ws.getCell(`F${r}`).value;
+    if (v != null && String(v).trim() !== '') sourceLastDataRow = r;
   }
 
-  // Wipe values in the data range (keep styles intact on existing rows).
-  // Look up to the source's last styled row but cap so the export stays small.
-  const lastRow = Math.min(ws.actualRowCount || ws.rowCount || 100, 200);
-  for (let r = DATA_START_ROW; r <= lastRow; r++) {
-    for (const col of DATA_COLS) {
+  // Snapshot row 12 for overflow rows + for normalizing row 11's F outlier
+  const rowSnap = snapshotRow(ws, STYLE_TEMPLATE_ROW, COLS);
+
+  items.forEach((it, i) => {
+    const r = DATA_START_ROW + i;
+    const overflow = r > sourceLastDataRow;
+    const setCell = (col, value) => {
+      const cell = ws.getCell(`${col}${r}`);
+      cell.value = value == null ? null : value;
+      // For rows beyond what the source pre-styled, paint row 12's styles
+      // so they don't render as plain cells.
+      if (overflow) applySnapshot(cell, rowSnap[col]);
+    };
+    setCell('B', null); // Source B11+ already has dates + correct numFmt; leave styles alone
+    ws.getCell(`B${r}`).value = new Date();
+    if (overflow) applySnapshot(ws.getCell(`B${r}`), rowSnap.B);
+    setCell('C', null);
+    setCell('D', 'Add Item');
+    setCell('E', 'Elec ');
+    setCell('F', it.partNo || '');
+    setCell('G', it.description || '');
+    setCell('H', it.brand || '');
+    setCell('I', it.qty || 1);
+    setCell('J', signer);
+    setCell('K', null);
+  });
+
+  // Clear source's leftover sample rows (keep styles, blank the values)
+  for (let r = DATA_START_ROW + items.length; r <= sourceLastDataRow; r++) {
+    for (const col of COLS) {
       ws.getCell(`${col}${r}`).value = null;
     }
   }
-
-  // Write items
-  items.forEach((it, i) => {
-    const r = DATA_START_ROW + i;
-    const set = (col, value, opts = {}) => {
-      const cell = ws.getCell(`${col}${r}`);
-      cell.value = value == null ? null : value;
-      applyStyle(cell, rowTemplate[col]);
-      if (opts.numFmt) cell.numFmt = opts.numFmt;
-    };
-    set('B', today, { numFmt: 'yyyy-mm-dd' });
-    set('C', null);
-    set('D', 'Add Item');
-    set('E', 'Elec ');
-    set('F', it.partNo || '');
-    set('G', it.description || '');
-    set('H', it.brand || '');
-    set('I', it.qty || 1, { numFmt: '0' });
-    set('J', signer);
-    set('K', null);
-    ws.getRow(r).height = 15;
-  });
 
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
