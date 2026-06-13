@@ -1,0 +1,16 @@
+node_modules
+dist
+.firebase
+.env
+.env.local
+.venv
+*.log
+.DS_Store
+.firebaserc
+.claude/settings.local.json
+src/firebase-config.local.js
+
+# Firebase service account keys — NEVER commit
+*firebase-adminsdk*.json
+*service-account*.json
+*-credentials.json
