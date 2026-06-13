@@ -1,25 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, X } from 'lucide-react';
 
-const AVATAR_COLORS = [
-  'bg-amber-500',
-  'bg-rose-500',
-  'bg-indigo-500',
-  'bg-emerald-500',
-  'bg-sky-500',
-  'bg-violet-500',
-  'bg-fuchsia-500',
-  'bg-orange-500',
-  'bg-teal-500',
-  'bg-cyan-500',
-];
-
-function colorFor(str) {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
-
 function pluralize(label, n) {
   if (n === 1) return `1 ${label.toLowerCase()}`;
   return `${n} ${label.toLowerCase()}s`;
@@ -32,7 +13,6 @@ export default function MultiSelect({
   onChange,
   allLabel,
   emptyMessage = 'No options',
-  showAvatars = true,
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
@@ -90,27 +70,17 @@ export default function MultiSelect({
             ) : (
               options.map((opt) => {
                 const isSel = selectedSet.has(opt);
-                const initial = (opt || '?').trim().charAt(0).toUpperCase();
                 return (
                   <button
                     key={opt}
                     type="button"
                     onClick={() => toggle(opt)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm text-left transition ${
+                    className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition ${
                       isSel
                         ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-900 dark:text-indigo-100'
                         : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                   >
-                    {showAvatars && (
-                      <span
-                        className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${colorFor(
-                          opt
-                        )}`}
-                      >
-                        {initial}
-                      </span>
-                    )}
                     <span className="flex-1 truncate font-medium">{opt}</span>
                     {isSel && (
                       <Check
