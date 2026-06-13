@@ -1,4 +1,5 @@
-import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -36,14 +37,26 @@ export default function BOMDetail() {
   const [showSaveTpl, setShowSaveTpl] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [exportMenuPos, setExportMenuPos] = useState(null);
+  const exportBtnRef = useRef(null);
   const exportMenuRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (!exportMenuOpen || !exportBtnRef.current) return;
+    const rect = exportBtnRef.current.getBoundingClientRect();
+    const menuWidth = 256;
+    setExportMenuPos({
+      top: rect.bottom + 6,
+      left: Math.max(8, rect.right - menuWidth),
+    });
+  }, [exportMenuOpen]);
 
   useEffect(() => {
     if (!exportMenuOpen) return;
     const onDown = (e) => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
-        setExportMenuOpen(false);
-      }
+      const insideBtn = exportBtnRef.current?.contains(e.target);
+      const insideMenu = exportMenuRef.current?.contains(e.target);
+      if (!insideBtn && !insideMenu) setExportMenuOpen(false);
     };
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
@@ -258,41 +271,50 @@ export default function BOMDetail() {
             >
               <Pencil className="w-3.5 h-3.5" /> Edit
             </button>
-            <div className="relative" ref={exportMenuRef}>
-              <button
-                onClick={() => setExportMenuOpen((v) => !v)}
-                disabled={exporting || items.length === 0}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold transition disabled:opacity-50"
+            <button
+              ref={exportBtnRef}
+              onClick={() => setExportMenuOpen((v) => !v)}
+              disabled={exporting || items.length === 0}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold transition disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {exporting ? 'Exporting…' : 'Export'}
+              <ChevronDown
+                className={`w-3 h-3 transition-transform ${exportMenuOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
+            {exportMenuOpen && exportMenuPos && createPortal(
+              <div
+                ref={exportMenuRef}
+                style={{
+                  position: 'fixed',
+                  top: exportMenuPos.top,
+                  left: exportMenuPos.left,
+                  width: 256,
+                }}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden z-[100]"
               >
-                <Download className="w-3.5 h-3.5" />
-                {exporting ? 'Exporting…' : 'Export'}
-                <ChevronDown
-                  className={`w-3 h-3 transition-transform ${exportMenuOpen ? 'rotate-180' : ''}`}
-                />
-              </button>
-              {exportMenuOpen && (
-                <div className="absolute right-0 mt-1.5 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl z-30 overflow-hidden">
-                  <button
-                    onClick={() => runExport('revision')}
-                    className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
-                  >
-                    <div className="font-semibold">Revision History</div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                      Electrical revision form (.xlsx)
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => runExport('phi')}
-                    className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border-t border-slate-100 dark:border-slate-800"
-                  >
-                    <div className="font-semibold">PHI BOM Template</div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                      Design Mode 2 with คำแนะนำ tab
-                    </div>
-                  </button>
-                </div>
-              )}
-            </div>
+                <button
+                  onClick={() => runExport('revision')}
+                  className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                >
+                  <div className="font-semibold">Revision History</div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                    Electrical revision form (.xlsx)
+                  </div>
+                </button>
+                <button
+                  onClick={() => runExport('phi')}
+                  className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border-t border-slate-100 dark:border-slate-800"
+                >
+                  <div className="font-semibold">PHI BOM Template</div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                    Design Mode 2 with คำแนะนำ tab
+                  </div>
+                </button>
+              </div>,
+              document.body
+            )}
             <button
               onClick={() => setShowSaveTpl(true)}
               disabled={items.length === 0}
