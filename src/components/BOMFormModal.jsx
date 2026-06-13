@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { X, ClipboardList } from 'lucide-react';
+import { useContext, useEffect, useMemo, useState } from 'react';
+import { X, ClipboardList, Lock } from 'lucide-react';
+import { DataContext } from '../App.jsx';
 
 export default function BOMFormModal({
   initial,
@@ -10,6 +11,20 @@ export default function BOMFormModal({
   onSubmit,
   onCancel,
 }) {
+  const { boms } = useContext(DataContext);
+
+  const { existingProjects, existingBoms } = useMemo(() => {
+    const projects = new Map();
+    const bomMap = new Map();
+    for (const b of boms) {
+      const pn = (b.projectNo || '').trim();
+      if (pn && !projects.has(pn)) projects.set(pn, (b.projectName || '').trim());
+      const bn = (b.bomNo || '').trim();
+      if (bn && !bomMap.has(bn)) bomMap.set(bn, (b.bomName || '').trim());
+    }
+    return { existingProjects: projects, existingBoms: bomMap };
+  }, [boms]);
+
   const [form, setForm] = useState({
     projectNo: initial?.projectNo || '',
     projectName: initial?.projectName || '',
@@ -19,6 +34,25 @@ export default function BOMFormModal({
     templateId: '',
   });
   const [saving, setSaving] = useState(false);
+
+  const projectKey = form.projectNo.trim();
+  const bomKey = form.bomNo.trim();
+  const projectLocked = existingProjects.has(projectKey);
+  const bomLocked = existingBoms.has(bomKey);
+
+  useEffect(() => {
+    if (projectLocked) {
+      const name = existingProjects.get(projectKey) || '';
+      if (form.projectName !== name) setForm((f) => ({ ...f, projectName: name }));
+    }
+  }, [projectKey, projectLocked, existingProjects]);
+
+  useEffect(() => {
+    if (bomLocked) {
+      const name = existingBoms.get(bomKey) || '';
+      if (form.bomName !== name) setForm((f) => ({ ...f, bomName: name }));
+    }
+  }, [bomKey, bomLocked, existingBoms]);
 
   const update = (field) => (e) => setForm({ ...form, [field]: e.target.value });
 
@@ -78,20 +112,87 @@ export default function BOMFormModal({
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Project No." required>
-              <input value={form.projectNo} onChange={update('projectNo')} autoFocus className={inputClass} />
+            <Field
+              label="Project No."
+              required
+              hint={
+                projectLocked
+                  ? 'Existing project — name locked'
+                  : projectKey
+                  ? 'New project'
+                  : 'Pick from list or type new'
+              }
+            >
+              <input
+                list="bom-existing-projects"
+                value={form.projectNo}
+                onChange={update('projectNo')}
+                placeholder="e.g. PRJ-001"
+                autoFocus
+                className={inputClass}
+              />
+              <datalist id="bom-existing-projects">
+                {[...existingProjects.entries()].map(([no, name]) => (
+                  <option key={no} value={no}>
+                    {name}
+                  </option>
+                ))}
+              </datalist>
             </Field>
-            <Field label="Project Name" required>
-              <input value={form.projectName} onChange={update('projectName')} className={inputClass} />
+            <Field
+              label="Project Name"
+              required
+              locked={projectLocked}
+            >
+              <input
+                value={form.projectName}
+                onChange={update('projectName')}
+                readOnly={projectLocked}
+                placeholder={projectLocked ? '' : 'Project name'}
+                className={projectLocked ? lockedInputClass : inputClass}
+              />
             </Field>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="BOM No." required>
-              <input value={form.bomNo} onChange={update('bomNo')} className={inputClass} />
+            <Field
+              label="BOM No."
+              required
+              hint={
+                bomLocked
+                  ? 'Existing BOM no. — name locked'
+                  : bomKey
+                  ? 'New BOM'
+                  : 'Pick from list or type new'
+              }
+            >
+              <input
+                list="bom-existing-boms"
+                value={form.bomNo}
+                onChange={update('bomNo')}
+                placeholder="e.g. BOM-A1"
+                className={inputClass}
+              />
+              <datalist id="bom-existing-boms">
+                {[...existingBoms.entries()].map(([no, name]) => (
+                  <option key={no} value={no}>
+                    {name}
+                  </option>
+                ))}
+              </datalist>
             </Field>
-            <Field label="BOM Name" required>
-              <input value={form.bomName} onChange={update('bomName')} className={inputClass} />
+            <Field
+              label="BOM Name"
+              required
+              locked={bomLocked}
+            >
+              <input
+                value={form.bomName}
+                onChange={update('bomName')}
+                readOnly={bomLocked}
+                placeholder={bomLocked ? '' : 'BOM name'}
+                className={bomLocked ? lockedInputClass : inputClass}
+              />
             </Field>
           </div>
 
@@ -143,13 +244,29 @@ export default function BOMFormModal({
 const inputClass =
   'w-full px-3 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-700 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-slate-800 focus:border-transparent transition';
 
-function Field({ label, required, children }) {
+const lockedInputClass =
+  'w-full px-3 py-2.5 text-sm bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 rounded-xl border border-slate-200 dark:border-slate-700/50 cursor-not-allowed select-none';
+
+function Field({ label, required, locked, hint, children }) {
   return (
     <div>
-      <label className="block text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400 mb-1.5">
-        {label} {required && <span className="text-rose-500">*</span>}
+      <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400 mb-1.5">
+        <span>{label}</span>
+        {required && <span className="text-rose-500">*</span>}
+        {locked && <Lock className="w-3 h-3 text-slate-400 dark:text-slate-500" />}
       </label>
       {children}
+      {hint && (
+        <p
+          className={`mt-1 text-[10px] font-medium ${
+            locked
+              ? 'text-indigo-600 dark:text-indigo-400'
+              : 'text-slate-400 dark:text-slate-500'
+          }`}
+        >
+          {hint}
+        </p>
+      )}
     </div>
   );
 }
