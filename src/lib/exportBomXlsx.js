@@ -96,18 +96,20 @@ export async function exportBomXlsx(bom, items, user) {
     }
   }
 
-  // Force horizontal:left on Part No (F) and Description (G) across the
-  // entire data range — source rows had inconsistent alignment (some
-  // centered, some left, some unset). Run after value writes so the
-  // overflow-style snapshot does not clobber this.
+  // Force a clean left alignment on Part No (F) and Description (G) across
+  // the entire data range. Source rows had inconsistent alignment (some
+  // centered, some unset, F11 had wrapText:true) — drop everything and set
+  // an explicit, uniform alignment object so the column reads consistently.
   const lastForceRow = Math.max(
     sourceLastDataRow,
     DATA_START_ROW + items.length - 1
   );
   for (let r = DATA_START_ROW; r <= lastForceRow; r++) {
     for (const col of ['F', 'G']) {
-      const c = ws.getCell(`${col}${r}`);
-      c.alignment = { ...(c.alignment || {}), horizontal: 'left' };
+      ws.getCell(`${col}${r}`).alignment = {
+        horizontal: 'left',
+        vertical: 'middle',
+      };
     }
   }
 
