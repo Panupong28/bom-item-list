@@ -32,6 +32,9 @@ import { runSeed } from '../seed.js';
 const baht = (n) =>
   '฿' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
+// Cap rendered rows so large catalogs stay responsive; "Show more" reveals the rest.
+const PAGE_SIZE = 50;
+
 export default function PartsView() {
   const { category } = useParams();
   const decodedCategory = category ? decodeURIComponent(category) : null;
@@ -41,7 +44,7 @@ export default function PartsView() {
   // single-brand context (when exactly one brand is active it equals urlBrand).
   const brandFilter = urlBrand;
 
-  const { parts, partsByCategory, categories, loading } = useContext(DataContext);
+  const { parts, partsByCategory, categories, loading, refreshParts } = useContext(DataContext);
 
   const [search, setSearch] = useState('');
   const [brandFilters, setBrandFilters] = useState(() => (urlBrand ? [urlBrand] : []));
@@ -50,6 +53,7 @@ export default function PartsView() {
   const [editingPart, setEditingPart] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   // Two-way sync: URL ?brand <-> brandFilters when there's exactly one brand.
   useEffect(() => {
@@ -110,6 +114,13 @@ export default function PartsView() {
     return list;
   }, [scopeParts, search, brandFilters, categoryFilters]);
 
+  // Collapse back to the first page whenever the result set changes.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filteredParts]);
+
+  const visibleParts = filteredParts.slice(0, visibleCount);
+
   const stats = useMemo(() => {
     let scope = scopeParts;
     if (brandFilters.length > 0) {
@@ -134,6 +145,7 @@ export default function PartsView() {
   const handleAddPart = async (data) => {
     await addDoc(collection(db, 'parts'), { ...data, createdAt: serverTimestamp() });
     setShowAddModal(false);
+    await refreshParts();
   };
 
   const handleUpdatePart = async (data) => {
@@ -143,11 +155,13 @@ export default function PartsView() {
       updatedAt: serverTimestamp(),
     });
     setEditingPart(null);
+    await refreshParts();
   };
 
   const handleDeletePart = async (id) => {
     if (!confirm('Delete this part?')) return;
     await deleteDoc(doc(db, 'parts', id));
+    await refreshParts();
   };
 
   const handleSeed = async () => {
@@ -309,7 +323,7 @@ export default function PartsView() {
                 </tr>
               </thead>
               <tbody>
-                {filteredParts.map((p) => (
+                {visibleParts.map((p) => (
                   <tr
                     key={p.id}
                     className="border-b border-slate-100 dark:border-slate-800/70 last:border-0 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group"
@@ -368,18 +382,28 @@ export default function PartsView() {
               </tbody>
             </table>
           </div>
-          <div className="px-5 py-3 bg-slate-50/40 dark:bg-slate-900/40 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="px-5 py-3 bg-slate-50/40 dark:bg-slate-900/40 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
             <span className="micro-label">
-              Showing {filteredParts.length} of {scopeParts.length}
+              Showing {visibleParts.length} of {filteredParts.length}
             </span>
-            {activeFilterCount > 0 && (
-              <button
-                onClick={clearAllFilters}
-                className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
-              >
-                Clear filters
-              </button>
-            )}
+            <div className="flex items-center gap-4">
+              {visibleParts.length < filteredParts.length && (
+                <button
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
+                >
+                  Show more
+                </button>
+              )}
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={clearAllFilters}
+                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

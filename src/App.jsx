@@ -1,7 +1,7 @@
-import { createContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { db } from './firebase.js';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, query, orderBy } from 'firebase/firestore';
 import Sidebar from './components/Sidebar.jsx';
 import LoginScreen from './components/LoginScreen.jsx';
 import { useAuth } from './hooks/useAuth.js';
@@ -17,6 +17,18 @@ export default function App() {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const loadParts = useCallback(async () => {
+    if (!user) return;
+    try {
+      const snap = await getDocs(query(collection(db, 'parts'), orderBy('createdAt', 'asc')));
+      setParts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error('Failed to load parts:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (!user) {
       setParts([]);
@@ -27,44 +39,28 @@ export default function App() {
       return;
     }
     setLoading(true);
-    const unsubParts = onSnapshot(
-      query(collection(db, 'parts'), orderBy('createdAt', 'asc')),
-      (snap) => {
-        setParts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Failed to load parts:', err);
-        setLoading(false);
-      }
-    );
+    loadParts();
+
     const unsubCats = onSnapshot(
       query(collection(db, 'categories'), orderBy('name', 'asc')),
-      (snap) => {
-        setCategories(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      }
+      (snap) => setCategories(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
     const unsubBoms = onSnapshot(
       query(collection(db, 'boms'), orderBy('createdAt', 'desc')),
-      (snap) => {
-        setBoms(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      },
+      (snap) => setBoms(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
       (err) => console.error('Failed to load boms:', err)
     );
     const unsubTpl = onSnapshot(
       query(collection(db, 'bomTemplates'), orderBy('createdAt', 'desc')),
-      (snap) => {
-        setTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      },
+      (snap) => setTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
       (err) => console.error('Failed to load templates:', err)
     );
     return () => {
-      unsubParts();
       unsubCats();
       unsubBoms();
       unsubTpl();
     };
-  }, [user]);
+  }, [user, loadParts]);
 
   const partsByCategory = useMemo(() => {
     const map = {};
@@ -117,6 +113,7 @@ export default function App() {
           boms,
           templates,
           loading,
+          refreshParts: loadParts,
         }}
       >
         <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-slate-950">
