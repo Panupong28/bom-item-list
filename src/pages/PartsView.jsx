@@ -53,7 +53,7 @@ export default function PartsView() {
   const [editingPart, setEditingPart] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [seeding, setSeeding] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Two-way sync: URL ?brand <-> brandFilters when there's exactly one brand.
   useEffect(() => {
@@ -114,12 +114,16 @@ export default function PartsView() {
     return list;
   }, [scopeParts, search, brandFilters, categoryFilters]);
 
-  // Collapse back to the first page whenever the result set changes.
+  // Reset to page 1 whenever filters/search change.
   useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
+    setCurrentPage(1);
   }, [filteredParts]);
 
-  const visibleParts = filteredParts.slice(0, visibleCount);
+  const totalPages = Math.ceil(filteredParts.length / PAGE_SIZE);
+  const visibleParts = filteredParts.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   const stats = useMemo(() => {
     let scope = scopeParts;
@@ -382,28 +386,25 @@ export default function PartsView() {
               </tbody>
             </table>
           </div>
-          <div className="px-5 py-3 bg-slate-50/40 dark:bg-slate-900/40 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+          <div className="px-5 py-3 bg-slate-50/40 dark:bg-slate-900/40 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
             <span className="micro-label">
-              Showing {visibleParts.length} of {filteredParts.length}
+              Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredParts.length)} of {filteredParts.length}
             </span>
-            <div className="flex items-center gap-4">
-              {visibleParts.length < filteredParts.length && (
-                <button
-                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
-                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
-                >
-                  Show more
-                </button>
-              )}
-              {activeFilterCount > 0 && (
-                <button
-                  onClick={clearAllFilters}
-                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
+            {totalPages > 1 && (
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onChange={setCurrentPage}
+              />
+            )}
+            {activeFilterCount > 0 && (
+              <button
+                onClick={clearAllFilters}
+                className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -566,6 +567,64 @@ function EmptyState({ hasParts }) {
       <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
         {hasParts ? 'No parts match your filter.' : 'No parts yet.'}
       </p>
+    </div>
+  );
+}
+
+function Pagination({ currentPage, totalPages, onChange }) {
+  const pages = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (currentPage > 3) pages.push('…');
+    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+      pages.push(i);
+    }
+    if (currentPage < totalPages - 2) pages.push('…');
+    pages.push(totalPages);
+  }
+
+  const btn =
+    'inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs font-semibold transition';
+  const active = 'bg-indigo-600 text-white shadow-sm';
+  const idle = 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800';
+  const disabled = 'text-slate-300 dark:text-slate-700 cursor-not-allowed';
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        className={`${btn} ${currentPage === 1 ? disabled : idle}`}
+        onClick={() => onChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        aria-label="Previous page"
+      >
+        ‹
+      </button>
+      {pages.map((p, i) =>
+        p === '…' ? (
+          <span key={`ellipsis-${i}`} className="w-8 text-center text-xs text-slate-400 dark:text-slate-600 select-none">
+            …
+          </span>
+        ) : (
+          <button
+            key={p}
+            className={`${btn} ${p === currentPage ? active : idle}`}
+            onClick={() => onChange(p)}
+            aria-current={p === currentPage ? 'page' : undefined}
+          >
+            {p}
+          </button>
+        )
+      )}
+      <button
+        className={`${btn} ${currentPage === totalPages ? disabled : idle}`}
+        onClick={() => onChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        aria-label="Next page"
+      >
+        ›
+      </button>
     </div>
   );
 }
