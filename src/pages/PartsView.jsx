@@ -28,8 +28,6 @@ import AddPartModal from '../components/AddPartModal.jsx';
 import ImportPartsModal from '../components/ImportPartsModal.jsx';
 import MultiSelect from '../components/MultiSelect.jsx';
 import { runSeed } from '../seed.js';
-import { filterParts } from '../lib/filterParts.js';
-import { getPageNumbers } from '../lib/pagination.js';
 
 const baht = (n) =>
   '฿' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -46,8 +44,7 @@ export default function PartsView() {
   // single-brand context (when exactly one brand is active it equals urlBrand).
   const brandFilter = urlBrand;
 
-  const { parts, partsByCategory, categories, loading, upsertPart, removePart } =
-    useContext(DataContext);
+  const { parts, partsByCategory, categories, loading, refreshParts } = useContext(DataContext);
 
   const [search, setSearch] = useState('');
   const [brandFilters, setBrandFilters] = useState(() => (urlBrand ? [urlBrand] : []));
@@ -95,22 +92,38 @@ export default function PartsView() {
     return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   }, [scopeParts]);
 
-  const filteredParts = useMemo(
-    () => filterParts(scopeParts, { search, brandFilters, categoryFilters }),
-    [scopeParts, search, brandFilters, categoryFilters]
-  );
+  const filteredParts = useMemo(() => {
+    let list = scopeParts;
+    if (brandFilters.length > 0) {
+      const set = new Set(brandFilters);
+      list = list.filter((p) => set.has((p.brand || '').trim()));
+    }
+    if (categoryFilters.length > 0) {
+      const set = new Set(categoryFilters);
+      list = list.filter((p) => set.has(p.category));
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.description?.toLowerCase().includes(q) ||
+          p.partNo?.toLowerCase().includes(q) ||
+          p.brand?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [scopeParts, search, brandFilters, categoryFilters]);
 
-  // Reset to page 1 when the filter criteria change (not when the underlying
-  // data mutates), so editing or deleting a row keeps you on the current page.
+  // Reset to page 1 whenever filters/search change.
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, brandFilters, categoryFilters, decodedCategory]);
+  }, [filteredParts]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredParts.length / PAGE_SIZE));
-  // Clamp during render so a shrinking result set can't leave us past the last
-  // page (which would show an empty slice for a frame).
-  const page = Math.min(currentPage, totalPages);
-  const visibleParts = filteredParts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.ceil(filteredParts.length / PAGE_SIZE);
+  const visibleParts = filteredParts.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
 
   const stats = useMemo(() => {
     let scope = scopeParts;
@@ -134,9 +147,9 @@ export default function PartsView() {
   }, [scopeParts, brandFilters, categoryFilters]);
 
   const handleAddPart = async (data) => {
-    const ref = await addDoc(collection(db, 'parts'), { ...data, createdAt: serverTimestamp() });
-    upsertPart({ id: ref.id, ...data, createdAt: new Date() });
+    await addDoc(collection(db, 'parts'), { ...data, createdAt: serverTimestamp() });
     setShowAddModal(false);
+    await refreshParts();
   };
 
   const handleUpdatePart = async (data) => {
@@ -145,14 +158,14 @@ export default function PartsView() {
       ...data,
       updatedAt: serverTimestamp(),
     });
-    upsertPart({ id: editingPart.id, ...data, updatedAt: new Date() });
     setEditingPart(null);
+    await refreshParts();
   };
 
   const handleDeletePart = async (id) => {
     if (!confirm('Delete this part?')) return;
     await deleteDoc(doc(db, 'parts', id));
-    removePart(id);
+    await refreshParts();
   };
 
   const handleSeed = async () => {
@@ -375,11 +388,11 @@ export default function PartsView() {
           </div>
           <div className="px-5 py-3 bg-slate-50/40 dark:bg-slate-900/40 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
             <span className="micro-label">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredParts.length)} of {filteredParts.length}
+              Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredParts.length)} of {filteredParts.length}
             </span>
             {totalPages > 1 && (
               <Pagination
-                currentPage={page}
+                currentPage={currentPage}
                 totalPages={totalPages}
                 onChange={setCurrentPage}
               />
@@ -419,6 +432,21 @@ export default function PartsView() {
 
       {showImport && <ImportPartsModal onClose={() => setShowImport(false)} />}
     </div>
+  );
+}
+
+function FilterChip({ label, onClear }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
+      {label}
+      <button
+        onClick={onClear}
+        className="p-0.5 rounded hover:bg-indigo-100 dark:hover:bg-indigo-500/25"
+        aria-label="Clear filter"
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </span>
   );
 }
 
@@ -544,7 +572,18 @@ function EmptyState({ hasParts }) {
 }
 
 function Pagination({ currentPage, totalPages, onChange }) {
-  const pages = getPageNumbers(currentPage, totalPages);
+  const pages = [];
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (currentPage > 3) pages.push('…');
+    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+      pages.push(i);
+    }
+    if (currentPage < totalPages - 2) pages.push('…');
+    pages.push(totalPages);
+  }
 
   const btn =
     'inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs font-semibold transition';
