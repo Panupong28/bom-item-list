@@ -21,6 +21,7 @@ import PartPickerModal from '../components/PartPickerModal.jsx';
 import BOMFormModal from '../components/BOMFormModal.jsx';
 import MultiSelect from '../components/MultiSelect.jsx';
 import { buildPartsById, resolveItems } from '../lib/resolveItems.js';
+import { bomTotal } from '../lib/bomTotals.js';
 
 const baht = (n) =>
   '฿' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -114,13 +115,10 @@ export default function BOMDetail() {
     return list;
   }, [resolvedItems, search, brandFilters, categoryFilters]);
 
-  const total = useMemo(
-    () => resolvedItems.reduce((s, it) => s + (it.price || 0) * (it.qty || 1), 0),
-    [resolvedItems]
-  );
+  const total = useMemo(() => bomTotal(resolvedItems), [resolvedItems]);
 
   const filteredSubtotal = useMemo(
-    () => filteredItems.reduce((s, it) => s + (it.price || 0) * (it.qty || 1), 0),
+    () => bomTotal(filteredItems),
     [filteredItems]
   );
 
