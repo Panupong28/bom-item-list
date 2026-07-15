@@ -79,6 +79,22 @@ npm run dev
 
 Opens at http://localhost:5173. On first load you'll see a banner — click **Seed initial data** to import the 249 parts. (Safe: the seed refuses to run if the `parts` collection isn't empty.)
 
+### Run offline with mock data (no Firebase / no Google sign-in)
+
+To try the app in a container or CI where Google sign-in and Firestore aren't
+reachable:
+
+```bash
+npm run dev:mock
+```
+
+`dev:mock` sets `VITE_MOCK=1`, which aliases `firebase/auth` and
+`firebase/firestore` to in-memory shims (`src/mocks/`). It auto-signs-in a fake
+user (bypassing the Google popup) and seeds the store from `seed-data.json` plus
+a demo BOM and starter AI rules/knowledge — so the **AI Assist** panel is usable
+immediately. Nothing touches the real backend, and the flag is **never** set in
+production builds, so `npm run build` always uses the real Firebase SDK.
+
 ## Deploy to Firebase Hosting
 
 ```bash
