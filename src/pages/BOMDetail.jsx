@@ -13,6 +13,7 @@ import {
   X,
   Download,
   ChevronDown,
+  Sparkles,
 } from 'lucide-react';
 import { deleteDoc, doc, serverTimestamp, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { AuthContext, DataContext } from '../App.jsx';
@@ -20,6 +21,8 @@ import { db } from '../firebase.js';
 import PartPickerModal from '../components/PartPickerModal.jsx';
 import BOMFormModal from '../components/BOMFormModal.jsx';
 import MultiSelect from '../components/MultiSelect.jsx';
+import AiAssistantPanel from '../components/AiAssistantPanel.jsx';
+import AiTeachModal from '../components/AiTeachModal.jsx';
 import { buildPartsById, resolveItems } from '../lib/resolveItems.js';
 import { bomTotal } from '../lib/bomTotals.js';
 
@@ -28,7 +31,7 @@ const baht = (n) =>
 
 export default function BOMDetail() {
   const { id } = useParams();
-  const { boms, parts } = useContext(DataContext);
+  const { boms, parts, aiRules = [], aiKnowledge = [] } = useContext(DataContext);
   const authCtx = useContext(AuthContext);
   const navigate = useNavigate();
   const bom = boms.find((b) => b.id === id);
@@ -36,6 +39,8 @@ export default function BOMDetail() {
   const [showPicker, setShowPicker] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showSaveTpl, setShowSaveTpl] = useState(false);
+  const [showAi, setShowAi] = useState(false);
+  const [showTeach, setShowTeach] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exportMenuPos, setExportMenuPos] = useState(null);
@@ -67,6 +72,21 @@ export default function BOMDetail() {
   const [categoryFilters, setCategoryFilters] = useState([]);
 
   const partsById = useMemo(() => buildPartsById(parts), [parts]);
+
+  const libraryCategories = useMemo(() => {
+    const set = new Set();
+    for (const p of parts) if (p.category) set.add(p.category);
+    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [parts]);
+
+  const libraryBrands = useMemo(() => {
+    const set = new Set();
+    for (const p of parts) {
+      const b = (p.brand || '').trim();
+      if (b) set.add(b);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [parts]);
   const resolvedItems = useMemo(
     () => resolveItems(bom?.items, partsById).map((it, i) => ({ ...it, _idx: i })),
     [bom?.items, partsById]
@@ -164,6 +184,12 @@ export default function BOMDetail() {
     setShowPicker(false);
   };
 
+  // From the AI assistant — append items but keep the chat panel open so the user
+  // can continue the conversation.
+  const handleAddItemsFromAi = async (newItems) => {
+    await persistItems([...items, ...newItems]);
+  };
+
   const handleQtyChange = async (idx, qty) => {
     const n = parseInt(qty, 10);
     const safe = Number.isFinite(n) && n > 0 ? n : 1;
@@ -227,6 +253,7 @@ export default function BOMDetail() {
   };
 
   return (
+    <div className={showAi ? 'sm:pr-[400px] transition-[padding] duration-300' : 'transition-[padding] duration-300'}>
     <div className="px-6 lg:px-10 py-8 max-w-[1500px] mx-auto">
       <Link
         to="/boms"
@@ -263,6 +290,16 @@ export default function BOMDetail() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowAi((v) => !v)}
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition ${
+                showAi
+                  ? 'bg-white text-indigo-700 border-white'
+                  : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" /> AI Assist
+            </button>
             <button
               onClick={() => setShowEdit(true)}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-semibold transition"
@@ -568,6 +605,28 @@ export default function BOMDetail() {
           defaultName={bom.bomName}
           onCancel={() => setShowSaveTpl(false)}
           onSave={handleSaveTemplate}
+        />
+      )}
+    </div>
+
+      {showAi && (
+        <AiAssistantPanel
+          parts={parts}
+          rules={aiRules}
+          knowledge={aiKnowledge}
+          existingPartIds={items.map((it) => it.partId)}
+          onAddItems={handleAddItemsFromAi}
+          onOpenTeach={() => setShowTeach(true)}
+          onClose={() => setShowAi(false)}
+        />
+      )}
+      {showTeach && (
+        <AiTeachModal
+          rules={aiRules}
+          knowledge={aiKnowledge}
+          availableCategories={libraryCategories}
+          availableBrands={libraryBrands}
+          onClose={() => setShowTeach(false)}
         />
       )}
     </div>

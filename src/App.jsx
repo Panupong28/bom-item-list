@@ -15,6 +15,8 @@ export default function App() {
   const [categories, setCategories] = useState([]);
   const [boms, setBoms] = useState([]);
   const [templates, setTemplates] = useState([]);
+  const [aiRules, setAiRules] = useState([]);
+  const [aiKnowledge, setAiKnowledge] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadParts = useCallback(async () => {
@@ -35,6 +37,8 @@ export default function App() {
       setCategories([]);
       setBoms([]);
       setTemplates([]);
+      setAiRules([]);
+      setAiKnowledge([]);
       setLoading(false);
       return;
     }
@@ -55,10 +59,22 @@ export default function App() {
       (snap) => setTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
       (err) => console.error('Failed to load templates:', err)
     );
+    const unsubRules = onSnapshot(
+      query(collection(db, 'aiRules'), orderBy('createdAt', 'desc')),
+      (snap) => setAiRules(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (err) => console.error('Failed to load AI rules:', err)
+    );
+    const unsubKnow = onSnapshot(
+      query(collection(db, 'aiKnowledge'), orderBy('createdAt', 'desc')),
+      (snap) => setAiKnowledge(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (err) => console.error('Failed to load AI knowledge:', err)
+    );
     return () => {
       unsubCats();
       unsubBoms();
       unsubTpl();
+      unsubRules();
+      unsubKnow();
     };
   }, [user, loadParts]);
 
@@ -112,6 +128,8 @@ export default function App() {
           brands,
           boms,
           templates,
+          aiRules,
+          aiKnowledge,
           loading,
           refreshParts: loadParts,
         }}

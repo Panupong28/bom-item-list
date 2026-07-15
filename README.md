@@ -11,6 +11,30 @@ A React + Firebase web app for managing electrical/automation parts (PLC, HMI, B
 - Delete parts
 - One-click seed from the original spreadsheet (249 parts across 21 categories)
 - Real-time updates via Firestore `onSnapshot`
+- **AI BOM Assistant** — a rule-guided chat that helps pick items on a BOM (see below)
+
+## AI BOM Assistant
+
+Open any BOM and click **AI Assist** in the header to dock a chat panel on the right.
+
+The assistant is **deterministic and grounded** — it never free-generates a bill of
+materials. It only acts on rules and knowledge you teach it:
+
+- **Teach rules** (the *Teach* button → *Rules* tab): each rule maps **trigger phrases**
+  (e.g. `plc`, `control panel`) to **filters** (category / brand / part number /
+  description text) that select real parts from your library. A rule can require a
+  detail (brand, category, quantity) — if the request doesn't include it, the assistant
+  **asks you first** instead of guessing.
+- **Teach knowledge** (*Knowledge* tab): official facts/standards the assistant cites as
+  **references** next to its suggestions.
+- **How it answers:** it shows a transparent *Thinking* trace, cites the rules/knowledge
+  it used, and when the request matches, lists candidate parts with **checkboxes**
+  (select/unselect all, per-item quantity). Tick what you want and **Add** them to the BOM.
+- If nothing matches, it says so and asks you to rephrase or teach a rule — it will not
+  invent parts.
+
+Rules and knowledge are stored in the `aiRules` and `aiKnowledge` Firestore collections
+and shared across users of the app.
 
 ## Tech stack
 
