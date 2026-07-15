@@ -28,6 +28,8 @@ import AddPartModal from '../components/AddPartModal.jsx';
 import ImportPartsModal from '../components/ImportPartsModal.jsx';
 import MultiSelect from '../components/MultiSelect.jsx';
 import { runSeed } from '../seed.js';
+import { filterParts } from '../lib/filterParts.js';
+import { getPageNumbers } from '../lib/pagination.js';
 
 const baht = (n) =>
   '฿' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -93,27 +95,10 @@ export default function PartsView() {
     return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   }, [scopeParts]);
 
-  const filteredParts = useMemo(() => {
-    let list = scopeParts;
-    if (brandFilters.length > 0) {
-      const set = new Set(brandFilters);
-      list = list.filter((p) => set.has((p.brand || '').trim()));
-    }
-    if (categoryFilters.length > 0) {
-      const set = new Set(categoryFilters);
-      list = list.filter((p) => set.has(p.category));
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (p) =>
-          p.description?.toLowerCase().includes(q) ||
-          p.partNo?.toLowerCase().includes(q) ||
-          p.brand?.toLowerCase().includes(q)
-      );
-    }
-    return list;
-  }, [scopeParts, search, brandFilters, categoryFilters]);
+  const filteredParts = useMemo(
+    () => filterParts(scopeParts, { search, brandFilters, categoryFilters }),
+    [scopeParts, search, brandFilters, categoryFilters]
+  );
 
   // Reset to page 1 when the filter criteria change (not when the underlying
   // data mutates), so editing or deleting a row keeps you on the current page.
@@ -559,18 +544,7 @@ function EmptyState({ hasParts }) {
 }
 
 function Pagination({ currentPage, totalPages, onChange }) {
-  const pages = [];
-  if (totalPages <= 7) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i);
-  } else {
-    pages.push(1);
-    if (currentPage > 3) pages.push('…');
-    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-      pages.push(i);
-    }
-    if (currentPage < totalPages - 2) pages.push('…');
-    pages.push(totalPages);
-  }
+  const pages = getPageNumbers(currentPage, totalPages);
 
   const btn =
     'inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs font-semibold transition';
