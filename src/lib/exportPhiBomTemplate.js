@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { safeFilename as safe } from './filename.js';
 
 const TEMPLATE_PATH = '/samples/phi-bom-template.xlsx';
 const DATA_START_ROW = 9;
@@ -8,9 +9,6 @@ const CLASSIFICATION_LIST = '"PHI_PART,PHI_PART_WITH_MATERIAL,STD_PART,STD_FASTE
 const ROUTE_LIST = '"PRODUCTION,PURCHASING"';
 
 const clone = (v) => (v == null ? v : JSON.parse(JSON.stringify(v)));
-
-const safe = (s) =>
-  String(s || 'BOM').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_');
 
 function snapshotRow(ws, row, cols) {
   const out = {};

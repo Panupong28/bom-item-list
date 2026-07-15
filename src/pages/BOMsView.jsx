@@ -22,6 +22,7 @@ import {
 import { DataContext } from '../App.jsx';
 import { db } from '../firebase.js';
 import BOMFormModal from '../components/BOMFormModal.jsx';
+import { filterBoms, groupBomsByProject } from '../lib/groupBoms.js';
 
 export default function BOMsView() {
   const { boms, templates, parts } = useContext(DataContext);
@@ -30,34 +31,9 @@ export default function BOMsView() {
   const [editTarget, setEditTarget] = useState(null);
   const [expanded, setExpanded] = useState({});
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return boms;
-    return boms.filter(
-      (b) =>
-        b.projectNo?.toLowerCase().includes(q) ||
-        b.projectName?.toLowerCase().includes(q) ||
-        b.bomNo?.toLowerCase().includes(q) ||
-        b.bomName?.toLowerCase().includes(q)
-    );
-  }, [boms, search]);
+  const filtered = useMemo(() => filterBoms(boms, search), [boms, search]);
 
-  const groups = useMemo(() => {
-    const map = new Map();
-    for (const b of filtered) {
-      const key = `${b.projectNo || ''}||${b.projectName || ''}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          key,
-          projectNo: b.projectNo || '',
-          projectName: b.projectName || '',
-          boms: [],
-        });
-      }
-      map.get(key).boms.push(b);
-    }
-    return [...map.values()];
-  }, [filtered]);
+  const groups = useMemo(() => groupBomsByProject(filtered), [filtered]);
 
   const toggleGroup = (key) =>
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));

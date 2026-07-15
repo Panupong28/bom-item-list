@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { safeFilename as safe } from './filename.js';
 
 const TEMPLATE_PATH = '/samples/revision-history-template.xlsx';
 const DATA_START_ROW = 11;
@@ -6,8 +7,6 @@ const STYLE_TEMPLATE_ROW = 12; // row 11 has an outlier font; row 12 is consiste
 const COLS = ['B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
 
 const clone = (v) => (v == null ? v : JSON.parse(JSON.stringify(v)));
-const safe = (s) =>
-  String(s || 'BOM').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '_');
 
 function snapshotRow(ws, row, cols) {
   const out = {};
