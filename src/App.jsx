@@ -29,6 +29,22 @@ export default function App() {
     }
   }, [user]);
 
+  // Patch a single part in local state after a mutation, so we avoid re-fetching
+  // the whole collection on every add/edit. Appends when the id is new.
+  const upsertPart = useCallback((part) => {
+    setParts((prev) => {
+      const idx = prev.findIndex((p) => p.id === part.id);
+      if (idx === -1) return [...prev, part];
+      const next = prev.slice();
+      next[idx] = { ...next[idx], ...part };
+      return next;
+    });
+  }, []);
+
+  const removePart = useCallback((id) => {
+    setParts((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
   useEffect(() => {
     if (!user) {
       setParts([]);
@@ -114,6 +130,8 @@ export default function App() {
           templates,
           loading,
           refreshParts: loadParts,
+          upsertPart,
+          removePart,
         }}
       >
         <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-slate-950">
