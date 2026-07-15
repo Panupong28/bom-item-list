@@ -8,6 +8,8 @@ import {
   ClipboardList,
   FileStack,
   Package,
+  ChevronRight,
+  FolderOpen,
 } from 'lucide-react';
 import {
   addDoc,
@@ -26,6 +28,7 @@ export default function BOMsView() {
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
+  const [expanded, setExpanded] = useState({});
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -38,6 +41,28 @@ export default function BOMsView() {
         b.bomName?.toLowerCase().includes(q)
     );
   }, [boms, search]);
+
+  const groups = useMemo(() => {
+    const map = new Map();
+    for (const b of filtered) {
+      const key = `${b.projectNo || ''}||${b.projectName || ''}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          projectNo: b.projectNo || '',
+          projectName: b.projectName || '',
+          boms: [],
+        });
+      }
+      map.get(key).boms.push(b);
+    }
+    return [...map.values()];
+  }, [filtered]);
+
+  const toggleGroup = (key) =>
+    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const searching = !!search.trim();
 
   const handleCreate = async (data) => {
     const { templateId, ...rest } = data;
@@ -140,73 +165,101 @@ export default function BOMsView() {
           </p>
         </div>
       ) : (
-        <div className="card overflow-hidden">
-          <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60">
-                  <Th>Project No.</Th>
-                  <Th>Project Name</Th>
-                  <Th>BOM No.</Th>
-                  <Th>BOM Name</Th>
-                  <Th align="right">Items</Th>
-                  <Th align="center" className="w-24">Actions</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((b) => (
-                  <tr
-                    key={b.id}
-                    className="border-b border-slate-100 dark:border-slate-800/70 last:border-0 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group"
-                  >
-                    <Td className="font-mono text-slate-700 dark:text-slate-300">{b.projectNo}</Td>
-                    <Td>
-                      <Link
-                        to={`/boms/${b.id}`}
-                        className="font-medium text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400"
-                      >
-                        {b.projectName}
-                      </Link>
-                    </Td>
-                    <Td className="font-mono text-slate-700 dark:text-slate-300">{b.bomNo}</Td>
-                    <Td>
-                      <Link
-                        to={`/boms/${b.id}`}
-                        className="text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400"
-                      >
-                        {b.bomName}
-                      </Link>
-                    </Td>
-                    <Td align="right" className="tabular-nums">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                        {b.items?.length || 0}
+        <div className="space-y-3">
+          {groups.map((g) => {
+            const isOpen = searching || !!expanded[g.key];
+            return (
+              <div key={g.key} className="card overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(g.key)}
+                  className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                >
+                  <ChevronRight
+                    className={`w-4 h-4 text-slate-400 dark:text-slate-500 flex-shrink-0 transition-transform ${
+                      isOpen ? 'rotate-90' : ''
+                    }`}
+                    strokeWidth={2.5}
+                  />
+                  <span className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 flex-shrink-0">
+                    <FolderOpen className="w-4 h-4" />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        {g.projectNo || '—'}
                       </span>
-                    </Td>
-                    <Td align="center">
-                      <div className="inline-flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                        <button
-                          onClick={() => setEditTarget(b)}
-                          className="p-1.5 rounded-md text-slate-400 dark:text-slate-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
-                          aria-label="Edit"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(b)}
-                          className="p-1.5 rounded-md text-slate-400 dark:text-slate-500 hover:bg-rose-50 dark:hover:bg-rose-500/15 hover:text-rose-600 dark:hover:text-rose-400 transition"
-                          aria-label="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="px-5 py-3 bg-slate-50/40 dark:bg-slate-900/40 border-t border-slate-200 dark:border-slate-800">
-            <span className="micro-label">Showing {filtered.length} of {boms.length}</span>
+                    </div>
+                    <div className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                      {g.projectName || 'Untitled project'}
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex-shrink-0">
+                    {g.boms.length} BOM{g.boms.length === 1 ? '' : 's'}
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="border-t border-slate-100 dark:border-slate-800 overflow-x-auto scrollbar-thin">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60">
+                          <Th>BOM No.</Th>
+                          <Th>BOM Name</Th>
+                          <Th align="right">Items</Th>
+                          <Th align="center" className="w-24">Actions</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {g.boms.map((b) => (
+                          <tr
+                            key={b.id}
+                            className="border-b border-slate-100 dark:border-slate-800/70 last:border-0 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group"
+                          >
+                            <Td className="font-mono text-slate-700 dark:text-slate-300">{b.bomNo}</Td>
+                            <Td>
+                              <Link
+                                to={`/boms/${b.id}`}
+                                className="font-medium text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400"
+                              >
+                                {b.bomName}
+                              </Link>
+                            </Td>
+                            <Td align="right" className="tabular-nums">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                {b.items?.length || 0}
+                              </span>
+                            </Td>
+                            <Td align="center">
+                              <div className="inline-flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                                <button
+                                  onClick={() => setEditTarget(b)}
+                                  className="p-1.5 rounded-md text-slate-400 dark:text-slate-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
+                                  aria-label="Edit"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(b)}
+                                  className="p-1.5 rounded-md text-slate-400 dark:text-slate-500 hover:bg-rose-50 dark:hover:bg-rose-500/15 hover:text-rose-600 dark:hover:text-rose-400 transition"
+                                  aria-label="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </Td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <div className="px-1">
+            <span className="micro-label">
+              {groups.length} project{groups.length === 1 ? '' : 's'} · {filtered.length} of {boms.length} BOMs
+            </span>
           </div>
         </div>
       )}

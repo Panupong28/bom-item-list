@@ -44,7 +44,7 @@ export default function PartsView() {
   // single-brand context (when exactly one brand is active it equals urlBrand).
   const brandFilter = urlBrand;
 
-  const { parts, partsByCategory, categories, loading, refreshParts } = useContext(DataContext);
+  const { parts, partsByCategory, categories, brands, loading, refreshParts } = useContext(DataContext);
 
   const [search, setSearch] = useState('');
   const [brandFilters, setBrandFilters] = useState(() => (urlBrand ? [urlBrand] : []));
@@ -310,6 +310,8 @@ export default function PartsView() {
 
       {loading ? (
         <div className="p-16 text-center text-slate-500 dark:text-slate-400 card">Loading…</div>
+      ) : !decodedCategory && !hasFilter ? (
+        <SearchPrompt />
       ) : filteredParts.length === 0 ? (
         <EmptyState hasParts={parts.length > 0} />
       ) : (
@@ -412,6 +414,7 @@ export default function PartsView() {
       {showAddModal && (
         <AddPartModal
           categories={categories.map((c) => c.name)}
+          brands={brands}
           defaultCategory={decodedCategory}
           defaultBrand={brandFilter}
           existingParts={parts}
@@ -423,6 +426,7 @@ export default function PartsView() {
       {editingPart && (
         <AddPartModal
           categories={categories.map((c) => c.name)}
+          brands={brands}
           existingParts={parts}
           initialPart={editingPart}
           onSubmit={handleUpdatePart}
@@ -554,6 +558,19 @@ function SeedBanner({ onSeed, seeding }) {
         <Database className="w-4 h-4" />
         {seeding ? 'Seeding…' : 'Seed initial data'}
       </button>
+    </div>
+  );
+}
+
+function SearchPrompt() {
+  return (
+    <div className="card p-16 text-center">
+      <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 mb-4">
+        <Search className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />
+      </div>
+      <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+        Search or pick a category/brand to view parts.
+      </p>
     </div>
   );
 }

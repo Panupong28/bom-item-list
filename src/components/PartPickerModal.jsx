@@ -1,18 +1,43 @@
 import { useContext, useMemo, useState } from 'react';
 import { X, Search, Check, Plus } from 'lucide-react';
 import { DataContext } from '../App.jsx';
+import MultiSelect from './MultiSelect.jsx';
 
 export default function PartPickerModal({ existingPartIds = [], onAdd, onCancel }) {
-  const { parts, categories, brands } = useContext(DataContext);
+  const { parts } = useContext(DataContext);
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('');
-  const [brand, setBrand] = useState('');
+  const [categoryFilters, setCategoryFilters] = useState([]);
+  const [brandFilters, setBrandFilters] = useState([]);
   const [selected, setSelected] = useState({});
 
+  const hasFilter = !!(search.trim() || categoryFilters.length > 0 || brandFilters.length > 0);
+
+  const availableCategories = useMemo(() => {
+    const set = new Set();
+    for (const p of parts) if (p.category) set.add(p.category);
+    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [parts]);
+
+  const availableBrands = useMemo(() => {
+    const set = new Set();
+    for (const p of parts) {
+      const b = (p.brand || '').trim();
+      if (b) set.add(b);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  }, [parts]);
+
   const filtered = useMemo(() => {
+    if (!hasFilter) return [];
     let list = parts;
-    if (category) list = list.filter((p) => p.category === category);
-    if (brand) list = list.filter((p) => (p.brand || '').trim() === brand);
+    if (categoryFilters.length > 0) {
+      const set = new Set(categoryFilters);
+      list = list.filter((p) => set.has(p.category));
+    }
+    if (brandFilters.length > 0) {
+      const set = new Set(brandFilters);
+      list = list.filter((p) => set.has((p.brand || '').trim()));
+    }
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -23,7 +48,7 @@ export default function PartPickerModal({ existingPartIds = [], onAdd, onCancel 
       );
     }
     return list;
-  }, [parts, search, category, brand]);
+  }, [parts, search, categoryFilters, brandFilters, hasFilter]);
 
   const existingSet = useMemo(() => new Set(existingPartIds), [existingPartIds]);
 
@@ -55,10 +80,10 @@ export default function PartPickerModal({ existingPartIds = [], onAdd, onCancel 
       onClick={onCancel}
     >
       <div
-        className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[88vh] overflow-hidden border border-slate-200 dark:border-slate-800 flex flex-col"
+        className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[88vh] border border-slate-200 dark:border-slate-800 flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-violet-700 px-6 py-5 text-white flex-shrink-0">
+        <div className="relative overflow-hidden rounded-t-3xl bg-gradient-to-r from-indigo-600 to-violet-700 px-6 py-5 text-white flex-shrink-0">
           <div className="pointer-events-none absolute -top-12 -right-12 w-40 h-40 rounded-full bg-white/15 blur-3xl"></div>
           <div className="relative flex items-center justify-between">
             <div>
@@ -88,35 +113,27 @@ export default function PartPickerModal({ existingPartIds = [], onAdd, onCancel 
               className="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">All categories</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={brand}
-            onChange={(e) => setBrand(e.target.value)}
-            className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="">All brands</option>
-            {brands.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-          {(category || brand || search) && (
+          <MultiSelect
+            label="Category"
+            allLabel="All categories"
+            options={availableCategories}
+            selected={categoryFilters}
+            onChange={setCategoryFilters}
+            emptyMessage="No categories"
+          />
+          <MultiSelect
+            label="Brand"
+            allLabel="All brands"
+            options={availableBrands}
+            selected={brandFilters}
+            onChange={setBrandFilters}
+            emptyMessage="No brands"
+          />
+          {hasFilter && (
             <button
               onClick={() => {
-                setCategory('');
-                setBrand('');
+                setCategoryFilters([]);
+                setBrandFilters([]);
                 setSearch('');
               }}
               className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
@@ -125,7 +142,7 @@ export default function PartPickerModal({ existingPartIds = [], onAdd, onCancel 
             </button>
           )}
           <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-            {filtered.length} parts · {selectedCount} selected
+            {hasFilter ? `${filtered.length} parts` : 'Filter to view parts'} · {selectedCount} selected
           </span>
         </div>
 
@@ -152,7 +169,13 @@ export default function PartPickerModal({ existingPartIds = [], onAdd, onCancel 
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {!hasFilter ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-12 text-sm text-slate-500">
+                    Search or pick a category/brand to view parts.
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-12 text-sm text-slate-500">
                     No parts match the filter.
@@ -225,7 +248,7 @@ export default function PartPickerModal({ existingPartIds = [], onAdd, onCancel 
           </table>
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-2 flex-shrink-0">
+        <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 rounded-b-3xl bg-white dark:bg-slate-900 flex justify-end gap-2 flex-shrink-0">
           <button
             onClick={onCancel}
             className="px-4 py-2 text-sm font-semibold rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition"

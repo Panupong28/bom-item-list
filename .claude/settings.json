@@ -6,7 +6,8 @@
       "Bash(npm run lint)",
       "Bash(npm run typecheck)",
       "Bash(npm run test)",
-      "Bash(npm run build)"
+      "Bash(npm run build)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'Total parts: {len\\(d\\)}'\\); print\\('Keys:', list\\(d[0].keys\\(\\)\\) if d else 'empty'\\)\")"
     ]
   }
 }
