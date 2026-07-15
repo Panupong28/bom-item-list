@@ -5,14 +5,18 @@ quickly if a new develop version turns out to be broken.
 
 ## Version history
 
-| Version          | Git tag  | Status  | Notes                                    |
-| ---------------- | -------- | ------- | ---------------------------------------- |
-| `0.2.0-develop`  | —        | develop | Current in-progress version              |
-| `0.1.0`          | `v0.1.0` | stable  | Last known-good release — rollback point |
+| Version          | Git tag  | Commit    | Status  | Notes                                    |
+| ---------------- | -------- | --------- | ------- | ---------------------------------------- |
+| `0.2.0-develop`  | —        | —         | develop | Current in-progress version              |
+| `0.1.0`          | `v0.1.0` | `5791c56` | stable  | Last known-good release — rollback point |
 
-The stable version is preserved as the annotated git tag **`v0.1.0`** and is
-**not** deleted when develop work continues. It stays available as a rollback
-target for as long as the tag exists.
+The stable version is preserved two ways:
+
+- the annotated git tag **`v0.1.0`** (local), and
+- commit **`5791c56`** on the remote — it is the parent of the develop commit,
+  so it stays reachable in history and is the authoritative rollback target for
+  a fresh clone (use the commit SHA anywhere `v0.1.0` appears below if the tag
+  is not present).
 
 ## Roll back if `0.2.0-develop` is broken
 
